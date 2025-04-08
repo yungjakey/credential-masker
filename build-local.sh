@@ -3,10 +3,12 @@
 # Process command line arguments
 PUBLISH_RELEASE=false
 VERSION_TAG="latest"
+QUICK_BUILD=false
 
 while [[ "$#" -gt 0 ]]; do
     case $1 in
     --publish) PUBLISH_RELEASE=true ;;
+    --quick) QUICK_BUILD=true ;;
     --version)
         VERSION_TAG="$2"
         shift
@@ -32,6 +34,18 @@ fi
 # Create output directory
 mkdir -p dist
 
+# If quick build requested, just build for current platform
+if [ "$QUICK_BUILD" = true ]; then
+    echo "Performing quick build for pre-commit hook..."
+    go mod tidy
+    go mod verify
+    go test ./...
+    echo "Building for current platform..."
+    go build -o dist/credential-masker ./cmd
+    echo "✓ Quick build completed!"
+    exit 0
+fi
+
 # Define build configurations
 declare -a configs=(
     "linux amd64 dist/credential-masker-linux-amd64"
@@ -48,7 +62,7 @@ build_platform() {
     local output=$3
 
     echo "Building ${os}/${arch}..."
-    CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -o $output ./cmd
+    CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -o "${output}" ./cmd
     echo "✓ Built ${output}"
 }
 
@@ -58,7 +72,7 @@ export -f build_platform
 if [ "$PARALLEL_AVAILABLE" = true ]; then
     # Run builds in parallel
     echo "Building all platforms in parallel..."
-    printf '%s\n' "${configs[@]}" | parallel --colsep ' ' build_platform {1} {2} {3}
+    printf '%s\n' "${configs[@]}" | parallel --colsep ' ' 'build_platform {1} {2} {3}'
 else
     # Run builds sequentially if parallel is not available
     for config in "${configs[@]}"; do

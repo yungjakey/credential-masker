@@ -213,7 +213,7 @@ func (m *Masker) HandleBinary(path string) error {
 	}
 	// Create .txt file containing reference to the original file
 	txtFile := strings.TrimSuffix(path, ".p12") + ".txt"
-	if err = os.WriteFile(txtFile, fmt.Appendf(*new([]byte), placeholderPrefix, path), 0644); err != nil {
+	if err = os.WriteFile(txtFile, fmt.Appendf(*new([]byte), placeholderPrefix, path), 0600); err != nil {
 		return fmt.Errorf("Error creating placeholder file: %v", err)
 	}
 

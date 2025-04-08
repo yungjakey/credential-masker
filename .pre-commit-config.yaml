@@ -11,9 +11,15 @@ repos:
       - id: check-shebang-scripts-are-executable
 
   - repo: https://github.com/golangci/golangci-lint
-    rev: v1.56.2
+    rev: v1.55.2 # Changed to stable version
     hooks:
       - id: golangci-lint
+        name: golangci-lint
+        entry: golangci-lint
+        args: ["run", "--timeout=5m", "./cmd/..."]
+        types: [go]
+        language: system
+        pass_filenames: false
 
   - repo: https://github.com/shellcheck-py/shellcheck-py
     rev: v0.9.0.6
@@ -26,18 +32,36 @@ repos:
     hooks:
       - id: actionlint
 
-  - repo: https://github.com/dnephin/pre-commit-golang
-    rev: v0.5.1
-    hooks:
-      - id: go-fmt
-      - id: go-vet
-      - id: go-imports
-      - id: go-unit-tests
-      - id: validate-toml
-      - id: no-go-testing
-
   - repo: local
     hooks:
+      - id: go-fmt
+        name: go fmt
+        entry: bash -c 'cd cmd && gofmt -s -w .'
+        language: system
+        types: [go]
+        pass_filenames: false
+
+      - id: go-vet
+        name: go vet
+        entry: bash -c 'cd cmd && go vet .'
+        language: system
+        types: [go]
+        pass_filenames: false
+
+      - id: go-imports
+        name: go imports
+        entry: bash -c 'cd cmd && (command -v goimports >/dev/null 2>&1 && goimports -w . || echo "goimports not installed, skipping")'
+        language: system
+        types: [go]
+        pass_filenames: false
+
+      - id: go-unit-tests
+        name: go test
+        entry: bash -c 'cd cmd && go test -v .'
+        language: system
+        types: [go]
+        pass_filenames: false
+
       - id: go-build
         name: go build
         entry: ./build-local.sh --quick

@@ -31,13 +31,13 @@ func printUsage() {
 	fmt.Println("\nUsage:")
 	fmt.Println("  credential-masker [flags]")
 	fmt.Println("\nFlags:")
-	fmt.Println("  -s, --source-dir     Source directory containing original code")
-	fmt.Println("  -t, --target-dir     Target directory where masked code will be written")
-	fmt.Println("  -f, --findings-path  Path to gitleaks JSON findings file")
-	fmt.Println("  -v, --verbose        Enable verbose logging")
-	fmt.Println("  -h, --help           Display this help message")
+	fmt.Println("  --source     Source directory containing original code")
+	fmt.Println("  --target     Target directory where masked code will be written")
+	fmt.Println("  --findings   Path to gitleaks JSON findings file")
+	fmt.Println("  --log-level  Log level (DEBUG, INFO, SUCCESS, WARNING, ERROR, FATAL) [default: INFO]")
+	fmt.Println("  --help       Display this help message")
 	fmt.Println("\nExample:")
-	fmt.Println("  credential-masker --source-dir ./myproject --target-dir ./masked-project --findings-path ./gitleaks.json")
+	fmt.Println("  credential-masker --source ./myproject --target ./masked-project --findings ./gitleaks.json")
 }
 
 // loadFindings loads and parses the findings JSON file
@@ -111,7 +111,7 @@ func main() {
 			uniqueTypes[f.RuleID] = true
 		}
 
-		log.Info("Unique types of findings:")
+		log.Debug("Unique types of findings:")
 		for t := range uniqueTypes {
 			log.Debug("  - %s", t)
 		}

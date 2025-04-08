@@ -66,6 +66,10 @@ func (m *Masker) ProcessWithContext(ctx context.Context) map[string][]finding {
 	// Create a wait group to wait for all goroutines
 	var wg sync.WaitGroup
 
+	// Get total file count
+	totalFiles := len(m.findings)
+	currentFileIdx := 0
+
 	// Process each file
 	for path, fileFinding := range m.findings {
 		// Check if context is canceled
@@ -76,54 +80,49 @@ func (m *Masker) ProcessWithContext(ctx context.Context) map[string][]finding {
 			// Continue processing
 		}
 
+		// Increment file index before starting goroutine
+		currentFileIdx++
+		fileIdx := currentFileIdx // Capture current value for goroutine
+
 		// Acquire semaphore slot
 		sem <- struct{}{}
 
 		wg.Add(1)
-		go func(path string, fileFinding []finding) {
+		go func(path string, fileFinding []finding, idx int) {
 			// Release semaphore slot and mark as done when finished
 			defer func() {
 				<-sem
 				wg.Done()
 			}()
 
-			// Check if context has been canceled
-			select {
-			case <-ctx.Done():
-				m.logger.Debug("Processing canceled for file: %s", path)
-				return
-			default:
-				// Continue processing
-			}
-
-			m.logger.Info("Checking findings in %s", path)
+			m.logger.Info("[%d/%d] Checking findings in %s", idx, totalFiles, path)
 
 			// Check if any findings
 			if len(fileFinding) == 0 {
-				m.logger.Success("Nothing to do. File %s has no findings.", path)
+				m.logger.Success("[%d/%d] Nothing to do. File has no findings.", idx, totalFiles, path)
 				return
 			}
 
 			// Get appropriate file handler
 			handler, err := m.ParseFileType(path, fileFinding)
 			if err != nil {
-				m.logger.Error("Error parsing type of file: %v", err)
+				m.logger.Error("[%d/%d] Error parsing type of file: %v", idx, totalFiles, err)
 				return
 			}
 			if handler == nil {
-				m.logger.Success("Nothing to do. File %s is empty.", path)
+				m.logger.Success("[%d/%d] Nothing to do. File is empty.", idx, totalFiles, path)
 				return
 			}
 
 			// Handle file
 			err = handler()
 			if err != nil {
-				m.logger.Error("Error handling file: %v", err)
+				m.logger.Error("[%d/%d] Error handling file: %v", idx, totalFiles, err)
 				return
 			}
 
-			m.logger.Success("Handled %d finding(s)", len(fileFinding))
-		}(path, fileFinding)
+			m.logger.Success("[%d/%d] Handled %d finding(s)", idx, totalFiles, len(fileFinding))
+		}(path, fileFinding, fileIdx)
 	}
 
 	// Set up done channel for waiting with context support

@@ -1,4 +1,4 @@
-module github.com/Oesterreichischer-Rundfunk/ptdata-credential-scanning
+module github.com/yungjakey/credential-masker
 
 go 1.23.2
 

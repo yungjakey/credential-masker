@@ -1,0 +1,30 @@
+[
+    {
+        "RuleID": "api-key",
+        "File": "sample/file1.txt",
+        "Match": "secret1234",
+        "StartLine": 2,
+        "EndLine": 2
+    },
+    {
+        "RuleID": "password",
+        "File": "sample/file2.txt",
+        "Match": "abc123",
+        "StartLine": 2,
+        "EndLine": 2
+    },
+    {
+        "RuleID": "pkcs12-file",
+        "File": "sample/file3.p12",
+        "Match": "",
+        "StartLine": 0,
+        "EndLine": 0
+    },
+    {
+        "RuleID": "multiline-secret",
+        "File": "sample/file4.txt",
+        "Match": "BEGIN PRIVATE KEY\nXXXXXXXXXXXXXXXXX\nYYYYYYYYYYYYYYYYY\nEND PRIVATE KEY",
+        "StartLine": 5,
+        "EndLine": 8
+    }
+]

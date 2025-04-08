@@ -13,19 +13,6 @@ import (
 const placeholderPrefix = "This file was deleted because it matched the pkcs12-file rule. Original file: %s"
 const placeholderMask = "***[REDACTED]***"
 
-type chunk struct {
-	startLine int
-	endLine   int
-	match     string
-	content   []string // Lines in this chunk
-}
-
-type result struct {
-	startLine int
-	endLine   int
-	content   []string // Processed lines
-}
-
 // Masker handles the masking of sensitive data in files
 type Masker struct {
 	logger    *Logger
@@ -173,9 +160,8 @@ func (m *Masker) ParseFileType(path string, fileFinding []finding) (func() error
 			return m.HandleBinary(path)
 		}, nil
 	}
-
 	return func() error {
-		return m.HandleText(buf, fileFinding...)
+		return m.HandleText(buf, path, fileFinding...)
 	}, nil
 }
 
@@ -194,7 +180,7 @@ func (m *Masker) RecreateFile(path string, lines ...string) error {
 	defer f.Close()
 
 	if len(lines) > 0 {
-		content := strings.Join(lines, "\n")
+		content := strings.Join(lines, "\r\n")
 		if _, err := f.WriteString(content); err != nil {
 			return fmt.Errorf("Error writing to file: %v", err)
 		}
@@ -220,83 +206,22 @@ func (m *Masker) HandleBinary(path string) error {
 }
 
 // HandleText processes text files with sensitive data
-func (m *Masker) HandleText(buf []byte, findings ...finding) error {
-	// Convert buffer to string
-	lines := strings.Split(string(buf), "\n")
+func (m *Masker) HandleText(buf []byte, path string, findings ...finding) error {
+	// Join all lines to create a single text buffer
+	fullText := string(buf)
 
-	// Process chunks in parallel
-	numWorkers := runtime.NumCPU()
-	workChan := make(chan chunk, len(findings))
-	resultChan := make(chan result, len(findings))
-
-	// Context for cancellation
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// Create chunks
+	// Process each finding sequentially
 	for _, f := range findings {
-		// Get lines for this chunk (adjusting for 0-based index)
-		start, end := f.StartLine, f.EndLine
-
-		workChan <- chunk{
-			startLine: start - 1,
-			endLine:   end - 1,
-			match:     f.Match,
-			content:   lines[start-1 : end],
-		}
-	}
-	close(workChan)
-
-	// Start workers
-	var wg sync.WaitGroup
-	for i := 0; i < numWorkers; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-
-			for c := range workChan {
-				// Check for cancellation
-				select {
-				case <-ctx.Done():
-					return
-				default:
-					// Continue processing
-				}
-
-				sourceStr := strings.Join(c.content, "\n")
-				targetStr := strings.NewReplacer(c.match, placeholderMask).Replace(sourceStr)
-
-				resultChan <- result{
-					startLine: c.startLine,
-					endLine:   c.endLine,
-					content:   strings.Split(targetStr, "\n"),
-				}
-			}
-		}()
+		// Replace the match with our placeholder
+		fullText = strings.Replace(fullText, f.Match, placeholderMask, -1)
 	}
 
-	// Close result channel when all workers are done
-	go func() {
-		wg.Wait()
-		close(resultChan)
-	}()
-
-	// Collect results and update lines
-	for r := range resultChan {
-		// Check for cancellation
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-			// Continue processing
-		}
-
-		lines = append(lines[:r.startLine], append(r.content, lines[r.endLine:]...)...)
-	}
+	// Split text back into lines
+	updatedLines := strings.Split(fullText, "\r\n")
 
 	// Recreate file with updated lines
-	if err := m.RecreateFile(findings[0].File, lines...); err != nil {
-		return fmt.Errorf("Error recreating file: %v", err)
+	if err := m.RecreateFile(path, updatedLines...); err != nil {
+		return fmt.Errorf("error recreating file: %v", err)
 	}
 
 	return nil

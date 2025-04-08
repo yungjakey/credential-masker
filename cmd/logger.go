@@ -72,7 +72,7 @@ type Logger struct {
 }
 
 // New creates a new logger that writes to the provided writer
-func New(out io.Writer, minLevel LogLevel) *Logger {
+func NewLogger(out io.Writer, minLevel LogLevel) *Logger {
 	return &Logger{
 		out:      out,
 		minLevel: minLevel,
@@ -81,7 +81,7 @@ func New(out io.Writer, minLevel LogLevel) *Logger {
 
 // Default returns a logger that writes to stdout with minimum level INFO
 func Default() *Logger {
-	return New(os.Stdout, Info)
+	return NewLogger(os.Stdout, Info)
 }
 
 // SetMinLevel sets the minimum log level

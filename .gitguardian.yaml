@@ -1,0 +1,18 @@
+# Required, otherwise ggshield considers the file to use the deprecated v1 format
+version: 2
+
+# Set to true if the desired exit code for the CLI is always 0, otherwise the
+# exit code will be 1 if incidents are found.
+# The environment variable GITGUARDIAN_EXIT_ZERO=true can also be used toggle this behavior.
+exit_zero: false # default: false
+
+verbose: false # default: false
+
+secret:
+  # Exclude files and paths by globbing
+  ignored_paths:
+    - "testdata/**"
+    - "**/*_test.go"
+    - "**/mock*.json"
+
+  show_secrets: false # default: false

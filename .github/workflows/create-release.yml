@@ -4,6 +4,15 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Version tag (e.g., v1.0.0)'
+        required: true
+        default: ''
+
+env:
+  RELEASE_VERSION: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
 
 jobs:
   build-binaries:
@@ -36,7 +45,12 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-
+          
+      - name: Create tag if manually triggered
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git tag ${{ env.RELEASE_VERSION }} || true
+          
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
@@ -73,6 +87,8 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: ${{ env.RELEASE_VERSION }}
           files: |
             credential-masker-linux-amd64/credential-masker-linux-amd64
             credential-masker-linux-arm64/credential-masker-linux-arm64
@@ -82,4 +98,3 @@ jobs:
           draft: false
           prerelease: false
           generate_release_notes: true
-          token: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,37 @@
+# Configuration file for golangci-lint
+# See: https://golangci-lint.run/usage/configuration/
+version: "2"
+
+run:
+  # Default concurrency is a available CPU number
+  concurrency: 4
+  # Timeout for analysis, e.g. 30s, 5m, default is 1m
+  timeout: 5m
+  # Exit code when at least one issue was found, default is 1
+  issues-exit-code: 1
+  # Include test files or not, default is true
+  tests: true
+
+# Linters
+linters:
+  # Enable specific linters
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - unused
+    - staticcheck
+    - bodyclose
+    - goconst
+    - gocyclo
+    - gosec
+    - unconvert
+    - unparam
+
+# Issues configuration
+issues:
+  # List of regexps of issue texts to exclude
+  # Maximum issues count per one linter
+  max-issues-per-linter: 0
+  # Maximum count of issues with the same text
+  max-same-issues: 0

@@ -54,7 +54,7 @@ git clone https://github.com/yungjakey/credential-masker.git
 cd credential-masker
 
 # Build the binary
-go build -o bin/credential-masker ./cmd
+go build -o dist/credential-masker ./cmd
 ```
 
 ### Using Docker
@@ -207,3 +207,38 @@ You can trigger a release in two ways:
 ## Troubleshooting
 
 If you encounter issues during the build or release process, please refer to the [Troubleshooting Guide](docs/troubleshooting.md) for common solutions.
+
+## Development
+
+### Pre-commit Hooks
+
+This project uses pre-commit hooks to ensure code quality. To set up:
+
+1. Install pre-commit: `pip install pre-commit`
+2. Set up the git hooks: `pre-commit install`
+3. Make sure the build script is executable: `chmod +x build-local.sh`
+
+The pre-commit setup includes:
+- Code formatting (go fmt, go imports)
+- Linting (golangci-lint)
+- Shell script checking (shellcheck)
+- GitHub Actions workflow validation (actionlint)
+- Go tests and build verification
+- YAML and other file validations
+
+Now, the pre-commit hooks will run automatically before each commit, ensuring:
+- Code is properly formatted
+- Tests pass
+- Build succeeds
+- Shell scripts are valid
+- GitHub Actions workflows are valid
+
+You can manually run all pre-commit hooks with:
+```
+pre-commit run --all-files
+```
+
+To build for all platforms during pre-commit (optional):
+```
+BUILD_ALL_PLATFORMS=true pre-commit run go-build
+```

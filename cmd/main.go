@@ -11,7 +11,6 @@ import (
 	"time"
 
 	cp "github.com/otiai10/copy"
-	"github.com/rs/zerolog/log"
 )
 
 // stores gitleaks json
@@ -41,14 +40,14 @@ func loadFindings(path string) ([]finding, error) {
 	return findings, nil
 }
 
-func watcher(cancel context.CancelFunc) {
+func watcher(cancel context.CancelFunc, logger *Logger) {
 	// Setup signal handling
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 
 	sig := <-signalChan
-	log.Info("Received signal: %s", sig)
-	log.Info("Gracefully shutting down...")
+	logger.Info("Received signal: %s", sig)
+	logger.Info("Gracefully shutting down...")
 
 	// Create a timeout context for graceful shutdown
 	_, cancelTimeout := context.WithTimeout(context.Background(), 5*time.Second)
@@ -71,7 +70,7 @@ func main() {
 	defer cancel()
 
 	// Run the signal handler in a goroutine
-	go watcher(cancel)
+	go watcher(cancel, log)
 
 	findings, err := loadFindings(cfg.findingsPath)
 	if err != nil {

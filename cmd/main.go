@@ -1,10 +1,14 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
+	"time"
 
 	cp "github.com/otiai10/copy"
 )
@@ -43,8 +47,28 @@ func main() {
 		fmt.Printf("❌ %v\n", err)
 		os.Exit(1)
 	}
-
 	log := cfg.logger
+
+	// Create a context that can be canceled
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Setup signal handling
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
+
+	// Run the signal handler in a goroutine
+	go func() {
+		sig := <-signalChan
+		log.Info("Received signal: %s", sig)
+		log.Info("Gracefully shutting down...")
+
+		// Create a timeout context for graceful shutdown
+		_, cancelTimeout := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancelTimeout()
+
+		cancel() // Cancel the main context
+	}()
 
 	findings, err := loadFindings(cfg.findingsPath)
 	if err != nil {
@@ -78,8 +102,15 @@ func main() {
 	// Create a new Masker with findings and directories
 	masker := NewMasker(cfg.sourceDir, cfg.targetDir, findings, log)
 
-	// Process all findings
-	fileFindings := masker.Process()
+	// Process all findings with context
+	fileFindings := masker.ProcessWithContext(ctx)
+
+	// Check if context was canceled
+	if ctx.Err() != nil {
+		log.Warning("Processing was interrupted: %v", ctx.Err())
+		os.Exit(1)
+	}
+
 	log.Success("Processed %d findings", len(findings))
 
 	// Save file findings to JSON

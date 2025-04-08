@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"runtime"
@@ -29,7 +30,6 @@ type result struct {
 type Masker struct {
 	logger    *Logger
 	findings  map[string][]finding // Map of file path to findings
-	results   map[string]bool      // Map of file path to processing result
 	sourceDir string
 	targetDir string
 }
@@ -47,7 +47,6 @@ func NewMasker(sourceDir string, targetDir string, findings []finding, logger *L
 	return &Masker{
 		logger:    logger,
 		findings:  fileFindings,
-		results:   make(map[string]bool),
 		sourceDir: sourceDir,
 		targetDir: targetDir,
 	}
@@ -55,48 +54,94 @@ func NewMasker(sourceDir string, targetDir string, findings []finding, logger *L
 
 // Process processes all findings across files
 func (m *Masker) Process() map[string][]finding {
-	// Walk findings by file
+	return m.ProcessWithContext(context.Background())
+}
+
+// ProcessWithContext processes all findings across files with context support
+func (m *Masker) ProcessWithContext(ctx context.Context) map[string][]finding {
+	// Create a semaphore to limit concurrency
+	maxWorkers := runtime.NumCPU()
+	sem := make(chan struct{}, maxWorkers)
+
+	// Create a wait group to wait for all goroutines
+	var wg sync.WaitGroup
+
+	// Process each file
 	for path, fileFinding := range m.findings {
-		m.logger.Info("Checking findings in %s", path)
-
-		// Check if any findings
-		if len(fileFinding) == 0 {
-			m.logger.Success("Nothing to do. File %s has no findings.", path)
-			m.results[path] = true
-			continue
+		// Check if context is canceled
+		select {
+		case <-ctx.Done():
+			return m.findings
+		default:
+			// Continue processing
 		}
 
-		// Get appropriate file handler
-		handler, err := m.ParseFileType(path, fileFinding)
-		if err != nil {
-			m.logger.Error("Error parsing type of file: %v", err)
-			m.results[path] = false
-			continue
-		}
-		if handler == nil {
-			m.logger.Success("Nothing to do. File %s is empty.", path)
-			m.results[path] = true
-			continue
-		}
+		// Acquire semaphore slot
+		sem <- struct{}{}
 
-		// Handle file
-		err = handler()
-		if err != nil {
-			m.logger.Error("Error handling file: %v", err)
-			m.results[path] = false
-			continue
-		}
+		wg.Add(1)
+		go func(path string, fileFinding []finding) {
+			// Release semaphore slot and mark as done when finished
+			defer func() {
+				<-sem
+				wg.Done()
+			}()
 
-		m.results[path] = true
-		m.logger.Success("Handled %d finding(s)", len(fileFinding))
+			// Check if context has been canceled
+			select {
+			case <-ctx.Done():
+				m.logger.Debug("Processing canceled for file: %s", path)
+				return
+			default:
+				// Continue processing
+			}
+
+			m.logger.Info("Checking findings in %s", path)
+
+			// Check if any findings
+			if len(fileFinding) == 0 {
+				m.logger.Success("Nothing to do. File %s has no findings.", path)
+				return
+			}
+
+			// Get appropriate file handler
+			handler, err := m.ParseFileType(path, fileFinding)
+			if err != nil {
+				m.logger.Error("Error parsing type of file: %v", err)
+				return
+			}
+			if handler == nil {
+				m.logger.Success("Nothing to do. File %s is empty.", path)
+				return
+			}
+
+			// Handle file
+			err = handler()
+			if err != nil {
+				m.logger.Error("Error handling file: %v", err)
+				return
+			}
+
+			m.logger.Success("Handled %d finding(s)", len(fileFinding))
+		}(path, fileFinding)
+	}
+
+	// Set up done channel for waiting with context support
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	// Wait for all goroutines to complete or context to be canceled
+	select {
+	case <-done:
+		// All processing completed
+	case <-ctx.Done():
+		m.logger.Warning("Processing interrupted: %v", ctx.Err())
 	}
 
 	return m.findings
-}
-
-// GetResults returns the processing results
-func (m *Masker) GetResults() map[string]bool {
-	return m.results
 }
 
 // ParseFileType determines the appropriate handler for a file based on its contents and findings
@@ -185,6 +230,10 @@ func (m *Masker) HandleText(buf []byte, findings ...finding) error {
 	workChan := make(chan chunk, len(findings))
 	resultChan := make(chan result, len(findings))
 
+	// Context for cancellation
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	// Create chunks
 	for _, f := range findings {
 		// Get lines for this chunk (adjusting for 0-based index)
@@ -207,6 +256,14 @@ func (m *Masker) HandleText(buf []byte, findings ...finding) error {
 			defer wg.Done()
 
 			for c := range workChan {
+				// Check for cancellation
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					// Continue processing
+				}
+
 				sourceStr := strings.Join(c.content, "\n")
 				targetStr := strings.NewReplacer(c.match, placeholderMask).Replace(sourceStr)
 
@@ -220,11 +277,21 @@ func (m *Masker) HandleText(buf []byte, findings ...finding) error {
 	}
 
 	// Close result channel when all workers are done
-	wg.Wait()
-	close(resultChan)
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
 
 	// Collect results and update lines
 	for r := range resultChan {
+		// Check for cancellation
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			// Continue processing
+		}
+
 		lines = append(lines[:r.startLine], append(r.content, lines[r.endLine:]...)...)
 	}
 

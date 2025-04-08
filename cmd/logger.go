@@ -97,14 +97,14 @@ func (l *Logger) shouldLog(level LogLevel) bool {
 // Debug logs a debug message
 func (l *Logger) Debug(format string, v ...interface{}) {
 	if l.shouldLog(Debug) {
-		fmt.Fprintf(l.out, "[DEBUG] "+format+"\n", v...)
+		fmt.Fprintf(l.out, "❓ "+format+"\n", v...)
 	}
 }
 
 // Info logs an informational message
 func (l *Logger) Info(format string, v ...interface{}) {
 	if l.shouldLog(Info) {
-		fmt.Fprintf(l.out, format+"\n", v...)
+		fmt.Fprintf(l.out, "🔧 "+format+"\n", v...)
 	}
 }
 
@@ -132,7 +132,7 @@ func (l *Logger) Error(format string, v ...interface{}) {
 // Fatal logs an error message and exits with code 1
 func (l *Logger) Fatal(format string, v ...interface{}) {
 	if l.shouldLog(Fatal) {
-		l.Error(format, v...)
+		fmt.Fprintf(l.out, "💀 "+format+"\n", v...)
 		os.Exit(1)
 	}
 }

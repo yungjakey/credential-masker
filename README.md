@@ -197,12 +197,15 @@ You can trigger a release in two ways:
 
 1. **Local Release**: Run the build script with the `--publish` flag as shown above.
 
-2. **GitHub Actions Release**: Push a tag with the format `v*` (e.g., `v1.0.0`) to the repository:
-   ```bash
-   git tag v1.0.0
-   git push origin v1.0.0
-   ```
-   This will automatically trigger the GitHub Actions workflow to build and publish a release.
+2. **GitHub Actions Release**:
+ ```shell
+  git checkout -b feature/add-new-feature
+  # Make changes
+  # Update version in code
+  git tag v1.0.0
+  git push origin feature/add-new-feature --tags
+  # Create PR
+  ```
 
 ## Troubleshooting
 

@@ -51,8 +51,9 @@ jobs:
           # Disable CGO for cross-compilation
           CGO_ENABLED=0 GOOS=${{ matrix.platform.os }} GOARCH=${{ matrix.platform.arch }} go build -o ${{ matrix.platform.output }} ./cmd
 
+      # Update to v4 of the upload artifact action
       - name: Upload binary
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.platform.output }}
           path: ${{ matrix.platform.output }}
@@ -66,8 +67,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
         
+      # Update to v4 of the download artifact action
       - name: Download artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         
       # Fix artifact paths
       - name: Create Release

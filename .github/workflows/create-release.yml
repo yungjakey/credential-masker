@@ -2,17 +2,17 @@ name: Create Release
 
 on:
   push:
-    branches: [ main ]
     tags:
       - "v*"
 
 jobs:
   build-binaries:
+    name: Build Binaries
     runs-on: ubuntu-latest
     permissions:
       contents: write
     strategy:
-      fail-fast: false  # Prevent all jobs from failing if one fails
+      fail-fast: false
       matrix:
         platform:
           - os: linux
@@ -34,25 +34,24 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
           go-version: '1.23'
 
-      # Verify Go modules first
       - name: Verify Go modules
         run: |
           go mod tidy
           go mod verify
 
-      # Fix for the issue when building for Windows
       - name: Build binary
         run: |
           # Disable CGO for cross-compilation
           CGO_ENABLED=0 GOOS=${{ matrix.platform.os }} GOARCH=${{ matrix.platform.arch }} go build -o ${{ matrix.platform.output }} ./cmd
 
-      # Update to v4 of the upload artifact action
       - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
@@ -68,14 +67,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
         
-      # Update to v4 of the download artifact action
       - name: Download artifacts
         uses: actions/download-artifact@v4
         
-      # Fix artifact paths
       - name: Create Release
-        if: ${{ github.actor != 'nektos/act' }}  # Only run on GitHub, not locally with act
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: |
             credential-masker-linux-amd64/credential-masker-linux-amd64
@@ -86,3 +82,4 @@ jobs:
           draft: false
           prerelease: false
           generate_release_notes: true
+          token: ${{ secrets.GITHUB_TOKEN }}

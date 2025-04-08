@@ -144,10 +144,18 @@ Located at `.github/workflows/verify-pr.yml`, this workflow:
 
 Located at `.github/workflows/create-release.yml`, this workflow:
 
-- Triggers when a tag with the format `v*` is pushed
+- Triggers when a tag with the format `v*` is pushed (e.g., `v1.0.0`, `v2.3.1`)
 - Builds binaries for multiple platforms (Linux amd64/arm64, macOS amd64/arm64, Windows amd64)
 - Creates a GitHub release with the built binaries attached
 - Generates release notes automatically
+
+The workflow builds each binary with version information embedded and uploads them as separate artifacts, then combines them in the release. If you encounter issues with empty tags or incorrect file paths, ensure:
+
+1. You're pushing a tag that starts with 'v'
+2. The tag is properly formatted (e.g., `v1.0.0`)
+3. The GitHub token has appropriate permissions to create releases
+
+The release will appear in the GitHub Releases section with downloadable binaries for each platform.
 
 ## Docker Support
 

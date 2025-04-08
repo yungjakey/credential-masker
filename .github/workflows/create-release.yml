@@ -73,6 +73,7 @@ jobs:
         
       # Fix artifact paths
       - name: Create Release
+        if: ${{ github.actor != 'nektos/act' }}  # Only run on GitHub, not locally with act
         uses: softprops/action-gh-release@v1
         with:
           files: |

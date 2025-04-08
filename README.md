@@ -131,21 +131,21 @@ The tool consists of several Go modules in the `cmd` directory:
 
 The repository includes two GitHub workflow configurations:
 
-### Build and Publish Workflow
+### Verify PR Workflow
 
-Located at `.github/workflows/build-and-publish.yml`, this workflow:
+Located at `.github/workflows/verify-pr.yml`, this workflow:
 
-- Triggers on pushes to the main branch, tag pushes with format `v*`, and pull requests to main
-- Builds Docker images for multiple platforms (Linux amd64/arm64, Windows amd64)
-- Publishes built images to GitHub Container Registry (except for pull requests)
-- Tags images based on Git tags, branches, and commit SHAs
+- Triggers on pull requests to the main branch
+- Verifies Go modules are correctly configured
+- Runs tests to ensure code quality
+- Checks that the project builds successfully
 
 ### Create Release Workflow
 
 Located at `.github/workflows/create-release.yml`, this workflow:
 
 - Triggers when a tag with the format `v*` is pushed
-- Builds binaries for multiple platforms (Linux amd64/arm64, Windows amd64)
+- Builds binaries for multiple platforms (Linux amd64/arm64, macOS amd64/arm64, Windows amd64)
 - Creates a GitHub release with the built binaries attached
 - Generates release notes automatically
 
@@ -160,6 +160,41 @@ The repository includes a Dockerfile for containerization:
   - `GOOS`: Target operating system (default: linux)
   - `GOARCH`: Target architecture (default: amd64)
   - `BINARY_NAME`: Name of the built binary (default: credential-masker)
+
+## Local Building and Releases
+
+The repository includes a local build script that can be used to build the project for multiple platforms and optionally create GitHub releases.
+
+### Using the Local Build Script
+
+The `build-local.sh` script allows you to:
+
+- Build the project for multiple platforms (Linux, macOS, Windows) in parallel
+- Optionally create and publish a GitHub release with the built binaries
+
+```bash
+# Build for all platforms
+./build-local.sh
+
+# Build and publish a release with auto-detected version
+./build-local.sh --publish
+
+# Build and publish a release with a specific version tag
+./build-local.sh --publish --version v1.0.0
+```
+
+### Triggering a Release
+
+You can trigger a release in two ways:
+
+1. **Local Release**: Run the build script with the `--publish` flag as shown above.
+
+2. **GitHub Actions Release**: Push a tag with the format `v*` (e.g., `v1.0.0`) to the repository:
+   ```bash
+   git tag v1.0.0
+   git push origin v1.0.0
+   ```
+   This will automatically trigger the GitHub Actions workflow to build and publish a release.
 
 ## Troubleshooting
 

@@ -90,7 +90,7 @@ func main() {
 
 	// Check if the target directory exists
 	if _, err = os.Stat(cfg.targetDir); os.IsNotExist(err) {
-		log.Info("Target directory does not exist, recreating: %s", cfg.sourceDir)
+		log.Info("Target directory does not exist, creating: %s", cfg.sourceDir)
 
 		// Copy the source directory to the target directory
 		if err = cp.Copy(cfg.sourceDir, cfg.targetDir); err != nil {

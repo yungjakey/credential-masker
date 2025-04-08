@@ -14,6 +14,7 @@ jobs:
       contents: read
       packages: write
     strategy:
+      fail-fast: false  # Prevent cancellation of all jobs when one fails
       matrix:
         platform:
           - os: linux
@@ -29,6 +30,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+
+      # Set up QEMU for cross-platform builds
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -51,7 +56,28 @@ jobs:
             type=ref,event=branch,suffix=-${{ matrix.platform.os }}-${{ matrix.platform.arch }}
             type=sha,format=short,suffix=-${{ matrix.platform.os }}-${{ matrix.platform.arch }}
 
-      - name: Build and push Docker image
+      # Test for Go module issues
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.20'
+
+      - name: Verify Go modules
+        run: |
+          go mod tidy
+          go mod verify
+
+      # Windows build requires special handling
+      - name: Build Windows binary directly (if Windows)
+        if: matrix.platform.os == 'windows'
+        run: |
+          mkdir -p /tmp/win-build
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o /tmp/win-build/credential-masker.exe ./cmd
+          ls -la /tmp/win-build/
+
+      # Use specific Alpine version for consistency and only for non-Windows builds
+      - name: Build and push Docker image (non-Windows)
+        if: matrix.platform.os != 'windows'
         uses: docker/build-push-action@v4
         with:
           context: .
@@ -63,3 +89,22 @@ jobs:
             GOARCH=${{ matrix.platform.arch }}
             BINARY_NAME=credential-masker${{ matrix.platform.suffix }}
           platforms: ${{ matrix.platform.os }}/${{ matrix.platform.arch }}
+          # Add cache configuration
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Special handling for publishing Windows image
+      - name: Build Windows container
+        if: matrix.platform.os == 'windows' && github.event_name != 'pull_request'
+        run: |
+          # Create a minimal Dockerfile for Windows
+          echo "FROM mcr.microsoft.com/windows/nanoserver:ltsc2022" > Dockerfile.windows
+          echo "WORKDIR /app" >> Dockerfile.windows
+          echo "COPY /tmp/win-build/credential-masker.exe /app/" >> Dockerfile.windows
+          echo "ENTRYPOINT [\"/app/credential-masker.exe\"]" >> Dockerfile.windows
+          
+          # Build container
+          docker build -f Dockerfile.windows -t ghcr.io/${{ github.repository }}:${{ github.sha }}-windows-amd64 .
+          
+          # Push to registry
+          docker push ghcr.io/${{ github.repository }}:${{ github.sha }}-windows-amd64

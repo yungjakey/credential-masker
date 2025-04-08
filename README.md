@@ -160,3 +160,7 @@ The repository includes a Dockerfile for containerization:
   - `GOOS`: Target operating system (default: linux)
   - `GOARCH`: Target architecture (default: amd64)
   - `BINARY_NAME`: Name of the built binary (default: credential-masker)
+
+## Troubleshooting
+
+If you encounter issues during the build or release process, please refer to the [Troubleshooting Guide](docs/troubleshooting.md) for common solutions.

@@ -1,35 +1,38 @@
 # Build stage
-FROM golang:1.20-alpine AS builder
+FROM golang:1.20-alpine3.17 AS builder
 
-WORKDIR /app
-
-# Define build arguments with defaults
 ARG GOOS=linux
 ARG GOARCH=amd64
 ARG BINARY_NAME=credential-masker
 
-# Copy go mod and sum files
+WORKDIR /app
+
+# Download dependencies first (better caching)
 COPY go.mod go.sum ./
-# Download dependencies
 RUN go mod download
 
 # Copy source code
 COPY . .
 
-# Build for the specified platform
-RUN go build -o /app/bin/${BINARY_NAME} ./cmd/main.go
+# Build the application with specific OS/ARCH target
+RUN CGO_ENABLED=0 GOOS=${GOOS} GOARCH=${GOARCH} go build -o /app/bin/${BINARY_NAME} ./cmd
 
-# Final stage
-FROM alpine:latest
+# For non-Linux platforms we can stop here - the binary can be extracted from the builder
+FROM scratch AS export-stage
+COPY --from=builder /app/bin /
+
+# For Linux platforms, create a runnable container
+FROM alpine:3.17 AS run-stage
 
 ARG BINARY_NAME=credential-masker
 WORKDIR /app
 
-# Copy only the binary from the builder stage
-COPY --from=builder /app/bin/${BINARY_NAME} /app/${BINARY_NAME}
+COPY --from=builder /app/bin/${BINARY_NAME} /app/credential-masker
 
-# Set execute permissions
-RUN chmod +x /app/${BINARY_NAME}
+# Create a non-root user
+RUN adduser -D -u 1000 appuser && \
+    chown -R appuser:appuser /app
 
-# Default command
+USER appuser
+
 ENTRYPOINT ["/app/credential-masker"]

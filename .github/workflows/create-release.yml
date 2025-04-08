@@ -11,6 +11,7 @@ jobs:
     permissions:
       contents: write
     strategy:
+      fail-fast: false  # Prevent all jobs from failing if one fails
       matrix:
         platform:
           - os: linux
@@ -19,6 +20,12 @@ jobs:
           - os: linux
             arch: arm64
             output: credential-masker-linux-arm64
+          - os: darwin
+            arch: amd64
+            output: credential-masker-darwin-amd64
+          - os: darwin
+            arch: arm64
+            output: credential-masker-darwin-arm64
           - os: windows
             arch: amd64
             output: credential-masker-windows-amd64.exe
@@ -32,9 +39,17 @@ jobs:
         with:
           go-version: '1.20'
 
+      # Verify Go modules first
+      - name: Verify Go modules
+        run: |
+          go mod tidy
+          go mod verify
+
+      # Fix for the issue when building for Windows
       - name: Build binary
         run: |
-          GOOS=${{ matrix.platform.os }} GOARCH=${{ matrix.platform.arch }} go build -o ${{ matrix.platform.output }} ./cmd/main.go
+          # Disable CGO for cross-compilation
+          CGO_ENABLED=0 GOOS=${{ matrix.platform.os }} GOARCH=${{ matrix.platform.arch }} go build -o ${{ matrix.platform.output }} ./cmd
 
       - name: Upload binary
         uses: actions/upload-artifact@v3
@@ -54,12 +69,15 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v3
         
+      # Fix artifact paths
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
             credential-masker-linux-amd64/credential-masker-linux-amd64
             credential-masker-linux-arm64/credential-masker-linux-arm64
+            credential-masker-darwin-amd64/credential-masker-darwin-amd64
+            credential-masker-darwin-arm64/credential-masker-darwin-arm64
             credential-masker-windows-amd64.exe/credential-masker-windows-amd64.exe
           draft: false
           prerelease: false

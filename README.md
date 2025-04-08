@@ -21,6 +21,31 @@ Credential Masker is designed to process files containing sensitive credentials 
 
 Download the appropriate binary for your platform from the [Releases](https://github.com/yungjakey/credential-masker/releases) page.
 
+You can also use the following commands to download a specific release:
+
+```bash
+# For Linux (amd64)
+curl -L https://github.com/yungjakey/credential-masker/releases/download/v1.0.0/credential-masker-linux-amd64 -o credential-masker
+chmod +x credential-masker
+
+# For Linux (arm64)
+curl -L https://github.com/yungjakey/credential-masker/releases/download/v1.0.0/credential-masker-linux-arm64 -o credential-masker
+chmod +x credential-masker
+
+# For macOS (amd64)
+curl -L https://github.com/yungjakey/credential-masker/releases/download/v1.0.0/credential-masker-darwin-amd64 -o credential-masker
+chmod +x credential-masker
+
+# For macOS (arm64)
+curl -L https://github.com/yungjakey/credential-masker/releases/download/v1.0.0/credential-masker-darwin-arm64 -o credential-masker
+chmod +x credential-masker
+
+# For Windows
+curl -L https://github.com/yungjakey/credential-masker/releases/download/v1.0.0/credential-masker-windows-amd64.exe -o credential-masker.exe
+```
+
+Replace `v1.0.0` with the specific version you want to download.
+
 ### From source
 
 ```bash
@@ -135,11 +160,3 @@ The repository includes a Dockerfile for containerization:
   - `GOOS`: Target operating system (default: linux)
   - `GOARCH`: Target architecture (default: amd64)
   - `BINARY_NAME`: Name of the built binary (default: credential-masker)
-
-## License
-
-[Add your license information here]
-
-## Contributing
-
-[Add your contribution guidelines here]

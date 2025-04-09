@@ -220,7 +220,7 @@ func (m *Masker) HandleText(buf []byte, path string, findings ...finding) error 
 	// Process each finding sequentially
 	for _, f := range findings {
 		// Replace the match with our placeholder
-		maskSuffix := fmt.Sprintf("%s__%s", f.ID, f.RuleID)
+		maskSuffix := fmt.Sprintf("%s__%s", f.RuleID, f.ID)
 		placeholder := fmt.Sprintf(m.placeholderMask, maskPrefix, maskSuffix)
 		fullText = strings.Replace(fullText, f.Match, placeholder, -1)
 	}

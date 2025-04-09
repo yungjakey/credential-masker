@@ -49,7 +49,7 @@ func TestMasker_HandleText(t *testing.T) {
 	}
 
 	// Initialize the masker
-	masker := NewMasker(tmpDir, tmpDir, findings, "{{masked_%s_%s}}", "\n", logger)
+	masker := NewMasker(tmpDir, tmpDir, findings, "{{masked_%s__%s}}", "\n", logger)
 
 	// Test text file handling
 	buf, _ := os.ReadFile(testFilePath)
@@ -64,7 +64,7 @@ func TestMasker_HandleText(t *testing.T) {
 	}
 
 	// Verify masked content with the new UUID pattern
-	expected := "username=admin\n{{masked_test_test-id-1__password}}\n{{masked_test_test-id-2__api_key}}"
+	expected := "username=admin\n{{masked_test__password__test-id-1}}\n{{masked_test__api_key__test-id-2}}"
 	if string(modifiedContent) != expected {
 		t.Errorf("Expected content to be\n%s\nbut got\n%s", expected, string(modifiedContent))
 	}

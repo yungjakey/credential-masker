@@ -222,7 +222,7 @@ func (m *Masker) HandleText(buf []byte, path string, findings ...finding) error 
 		// Replace the match with our placeholder
 		maskSuffix := fmt.Sprintf("%s__%s", f.RuleID, f.ID)
 		placeholder := fmt.Sprintf(m.placeholderMask, maskPrefix, maskSuffix)
-		fullText = strings.Replace(fullText, f.Match, placeholder, -1)
+		fullText = strings.Replace(fullText, f.Secret, placeholder, -1)
 	}
 
 	// Split text back into lines

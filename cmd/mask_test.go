@@ -64,7 +64,7 @@ func TestMasker_HandleText(t *testing.T) {
 	}
 
 	// Verify masked content with the new UUID pattern
-	expected := "username=admin\n{{masked_test__password__test-id-1}}\n{{masked_test__api_key__test-id-2}}"
+	expected := "username=admin\npassword={{masked_test__password__test-id-1}}\napi_key={{masked_test__api_key__test-id-2}}"
 	if string(modifiedContent) != expected {
 		t.Errorf("Expected content to be\n%s\nbut got\n%s", expected, string(modifiedContent))
 	}

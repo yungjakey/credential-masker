@@ -53,6 +53,8 @@ declare -a configs=(
     "darwin amd64 dist/credential-masker-darwin-amd64"
     "darwin arm64 dist/credential-masker-darwin-arm64"
     "windows amd64 dist/credential-masker-windows-amd64.exe"
+    "android arm dist/credential-masker-android-arm"
+    "android arm64 dist/credential-masker-android-arm64"
 )
 
 # Build function for a single platform
@@ -129,7 +131,9 @@ if [ "$PUBLISH_RELEASE" = true ]; then
         dist/credential-masker-linux-arm64 \
         dist/credential-masker-darwin-amd64 \
         dist/credential-masker-darwin-arm64 \
-        dist/credential-masker-windows-amd64.exe
+        dist/credential-masker-windows-amd64.exe \
+        dist/credential-masker-android-arm \
+        dist/credential-masker-android-arm64
 
     echo "✓ Successfully published release $VERSION_TAG with binaries"
 fi

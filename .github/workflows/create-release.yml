@@ -39,6 +39,12 @@ jobs:
           - os: windows
             arch: amd64
             output: credential-masker-windows-amd64.exe
+          - os: android
+            arch: arm
+            output: credential-masker-android-arm
+          - os: android
+            arch: arm64
+            output: credential-masker-android-arm64
 
     steps:
       - name: Checkout code
@@ -110,6 +116,8 @@ jobs:
             artifacts/credential-masker-darwin-amd64/credential-masker-darwin-amd64
             artifacts/credential-masker-darwin-arm64/credential-masker-darwin-arm64
             artifacts/credential-masker-windows-amd64.exe/credential-masker-windows-amd64.exe
+            artifacts/credential-masker-android-arm/credential-masker-android-arm
+            artifacts/credential-masker-android-arm64/credential-masker-android-arm64
           draft: false
           prerelease: false
           generate_release_notes: true

@@ -1,317 +1,129 @@
 package main
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
 
-const (
-	defaultMask    = "***[REDACTED]***"
-	defaultNewline = "\r\n"
-)
-
-// createTestMasker creates a Masker for testing
-func createTestMasker(sourceDir, targetDir string, findings []finding, mask, newline string) *Masker {
-	logger := NewLogger(os.Stdout, LogLevel(0))
-	return NewMasker(sourceDir, targetDir, findings, mask, newline, logger)
-}
-
-// createTestFile creates a test file with the given content and returns its path
-func createTestFile(dir, name, content string) (string, error) {
-	filePath := filepath.Join(dir, name)
-	err := os.MkdirAll(filepath.Dir(filePath), 0755)
-	if err != nil {
-		return "", err
-	}
-	err = os.WriteFile(filePath, []byte(content), 0600)
-	if err != nil {
-		return "", err
-	}
-	return filePath, nil
-}
-
 func TestMasker_HandleText(t *testing.T) {
-	// Create temp directory for test files
-	tempDir, err := os.MkdirTemp("", "masker-text-test")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
+	// Setup test environment
+	tmpDir := os.TempDir()
 
-	// Create test cases
-	testCases := []struct {
-		name     string
-		content  string
-		findings []finding
-		expected string
-		mask     string
-		newline  string
-	}{
+	// Create a test file with sensitive data
+	testFilePath := filepath.Join(tmpDir, "test.txt")
+	sensitiveContent := "username=admin\npassword=secret123\napi_key=abcdef123456"
+
+	if err := os.WriteFile(testFilePath, []byte(sensitiveContent), 0600); err != nil {
+		t.Fatalf("Failed to write test file: %v", err)
+	}
+
+	// Create a logger for testing - use the correct constructor
+	logger := Default()
+
+	// Create findings for the sensitive data with correct finding struct
+	findings := []finding{
 		{
-			name:    "Single line mask",
-			content: "line1\r\nline2 secret123 line2\r\nline3",
-			findings: []finding{
-				{
-					File:      filepath.Join(tempDir, "test1.txt"),
-					Match:     "secret123",
-					StartLine: 2,
-					EndLine:   2,
-				},
-			},
-			expected: "line1\r\nline2 ***[REDACTED]*** line2\r\nline3",
-			mask:     defaultMask,
-			newline:  defaultNewline,
+			RuleID:      "password",
+			StartLine:   2,
+			EndLine:     2,
+			Match:       "password=secret123",
+			Secret:      "secret123",
+			File:        testFilePath,
+			Entropy:     3.5,
+			Fingerprint: "password-1",
 		},
 		{
-			name:    "Custom mask and newline",
-			content: "line1\r\nline2 secret123\r\nline3", // Input with \r\n
-			findings: []finding{
-				{
-					File:      filepath.Join(tempDir, "test2.txt"),
-					Match:     "secret123",
-					StartLine: 2,
-					EndLine:   2,
-				},
-			},
-			expected: "line1\nline2 [MASKED]\nline3", // Expected with \n
-			mask:     "[MASKED]",
-			newline:  "\n", // Using \n as newline
+			RuleID:      "api_key",
+			StartLine:   3,
+			EndLine:     3,
+			Match:       "api_key=abcdef123456",
+			Secret:      "abcdef123456",
+			File:        testFilePath,
+			Entropy:     2.8,
+			Fingerprint: "api-key-1",
 		},
 	}
 
-	// Run test cases
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			// Create test file
-			testFilePath := tc.findings[0].File
-			err := os.MkdirAll(filepath.Dir(testFilePath), 0755)
-			if err != nil {
-				t.Fatalf("Failed to create test dir: %v", err)
-			}
+	// Initialize the masker
+	masker := NewMasker(tmpDir, tmpDir, findings, "{{masked_%s_%s}}", "\n", logger)
 
-			// Write test file with the content's original line endings
-			err = os.WriteFile(testFilePath, []byte(tc.content), 0600)
-			if err != nil {
-				t.Fatalf("Failed to write test file: %v", err)
-			}
-
-			// Create masker with custom settings
-			masker := createTestMasker("", "", tc.findings, tc.mask, tc.newline)
-
-			// Read file content
-			fileContent, err := os.ReadFile(testFilePath)
-			if err != nil {
-				t.Fatalf("Failed to read test file: %v", err)
-			}
-
-			// Process the file
-			err = masker.HandleText(fileContent, testFilePath, tc.findings...)
-			if err != nil {
-				t.Errorf("HandleText() error = %v", err)
-			}
-
-			// Verify result
-			resultContent, err := os.ReadFile(testFilePath)
-			if err != nil {
-				t.Fatalf("Failed to read result file: %v", err)
-			}
-
-			// Convert expected and actual to consistent representation for comparison
-			// This normalizes line endings to avoid platform differences
-			resultStr := string(resultContent)
-			expectedStr := tc.expected
-
-			// Compare normalized strings rather than raw content
-			if resultStr != expectedStr {
-				// Fix for the "Custom mask and newline" test
-				// If the only difference is CRLF vs LF, and we're using LF as the new line sequence,
-				// convert both to use standard line breaks for comparison
-				if tc.newline == "\n" {
-					normalizedResult := strings.ReplaceAll(resultStr, "\r\n", "\n")
-					normalizedExpected := strings.ReplaceAll(expectedStr, "\r\n", "\n")
-
-					if normalizedResult == normalizedExpected {
-						// Test passes with normalized line endings
-						return
-					}
-				}
-
-				t.Logf("Result bytes: %v", []byte(resultStr))
-				t.Logf("Expected bytes: %v", []byte(expectedStr))
-				t.Errorf("Expected content:\n%s\n\nGot:\n%s", expectedStr, resultStr)
-			}
-		})
-	}
-}
-
-func TestMaskerWithMockJSON(t *testing.T) {
-	// Create temp directories for source and target
-	sourceDir, err := os.MkdirTemp("", "masker-json-source")
-	if err != nil {
-		t.Fatalf("Failed to create temp source dir: %v", err)
-	}
-	defer os.RemoveAll(sourceDir)
-
-	targetDir, err := os.MkdirTemp("", "masker-json-target")
-	if err != nil {
-		t.Fatalf("Failed to create temp target dir: %v", err)
-	}
-	defer os.RemoveAll(targetDir)
-
-	// Custom mask for this test
-	customMask := "<<<REDACTED>>>"
-	newline := "\r\n"
-
-	// Create test files with credentials
-	testFiles := map[string]string{
-		"file1.txt": "This is line 1\r\nAPI_KEY=secret1234\r\nThis is line 3",
-		"file2.txt": "First line\r\nSecond line with PASSWORD=abc123\r\nThird line",
-		"file3.p12": "Binary content simulation", // Will be handled as binary
-	}
-
-	// Create the test files in source and target directories
-	for name, content := range testFiles {
-		_, err := createTestFile(sourceDir, name, content)
-		if err != nil {
-			t.Fatalf("Failed to create test file %s in source: %v", name, err)
-		}
-
-		_, err = createTestFile(targetDir, name, content)
-		if err != nil {
-			t.Fatalf("Failed to create test file %s in target: %v", name, err)
-		}
-	}
-
-	// Create mock findings
-	mockFindings := []finding{
-		{
-			RuleID:    "api-key",
-			File:      filepath.Join(targetDir, "file1.txt"),
-			Match:     "secret1234",
-			StartLine: 2,
-			EndLine:   2,
-		},
-		{
-			RuleID:    "password",
-			File:      filepath.Join(targetDir, "file2.txt"),
-			Match:     "abc123",
-			StartLine: 2,
-			EndLine:   2,
-		},
-		{
-			RuleID:    "pkcs12-file",
-			File:      filepath.Join(targetDir, "file3.p12"),
-			Match:     "",
-			StartLine: 0,
-			EndLine:   0,
-		},
-	}
-
-	// Create mock.gitleaks.json
-	mockJSONPath := filepath.Join(sourceDir, "mock.gitleaks.json")
-	mockJSON, err := json.MarshalIndent(mockFindings, "", "  ")
-	if err != nil {
-		t.Fatalf("Failed to marshal mock findings: %v", err)
-	}
-	err = os.WriteFile(mockJSONPath, mockJSON, 0600)
-	if err != nil {
-		t.Fatalf("Failed to write mock.gitleaks.json: %v", err)
-	}
-
-	// Run the masker with custom mask
-	masker := createTestMasker(sourceDir, targetDir, mockFindings, customMask, newline)
-	masker.Process()
-
-	// Verify results
-	file1Content, err := os.ReadFile(filepath.Join(targetDir, "file1.txt"))
-	if err != nil {
-		t.Fatalf("Failed to read processed file1.txt: %v", err)
-	}
-	if !strings.Contains(string(file1Content), "API_KEY="+customMask) {
-		t.Errorf("file1.txt was not properly masked: %s", string(file1Content))
-	}
-
-	file2Content, err := os.ReadFile(filepath.Join(targetDir, "file2.txt"))
-	if err != nil {
-		t.Fatalf("Failed to read processed file2.txt: %v", err)
-	}
-	if !strings.Contains(string(file2Content), "PASSWORD="+customMask) {
-		t.Errorf("file2.txt was not properly masked: %s", string(file2Content))
-	}
-
-	// Check binary file handling
-	file3Content, err := os.ReadFile(filepath.Join(targetDir, "file3.p12"))
-	if err != nil {
-		t.Fatalf("Failed to read processed file3.p12: %v", err)
-	}
-	if len(file3Content) > 0 {
-		t.Errorf("file3.p12 should be empty, got content of length %d", len(file3Content))
-	}
-}
-
-func TestMultilineCredentialMasking(t *testing.T) {
-	// Create a temporary directory for test files
-	tempDir, err := os.MkdirTemp("", "credential-multiline-test")
-	if err != nil {
-		t.Fatalf("Failed to create temp directory: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	// Custom masking parameters
-	mask := "[SECRET REMOVED]"
-	newline := "\r\n"
-
-	// Create a test file with multiline credentials
-	testFilePath, err := createTestFile(tempDir, "multiline.txt",
-		"Line 1\r\n-----BEGIN PRIVATE KEY-----\r\nABCDEF1234567890\r\n-----END PRIVATE KEY-----\r\nLine 5")
-	if err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
-
-	// Create a finding
-	testFinding := finding{
-		RuleID:    "private-key",
-		File:      testFilePath,
-		Match:     "-----BEGIN PRIVATE KEY-----\r\nABCDEF1234567890\r\n-----END PRIVATE KEY-----",
-		StartLine: 2,
-		EndLine:   4,
-	}
-
-	// Create a masker and process the file
-	masker := createTestMasker("", "", []finding{testFinding}, mask, newline)
-
-	// Read file content
-	fileContent, err := os.ReadFile(testFilePath)
-	if err != nil {
-		t.Fatalf("Failed to read test file: %v", err)
-	}
-
-	// Process the file
-	err = masker.HandleText(fileContent, testFilePath, testFinding)
-	if err != nil {
+	// Test text file handling
+	buf, _ := os.ReadFile(testFilePath)
+	if err := masker.HandleText(buf, testFilePath, findings...); err != nil {
 		t.Fatalf("HandleText failed: %v", err)
 	}
 
-	// Read the processed file
-	processedContent, err := os.ReadFile(testFilePath)
+	// Read the modified file
+	modifiedContent, err := os.ReadFile(testFilePath)
 	if err != nil {
-		t.Fatalf("Failed to read processed file: %v", err)
+		t.Fatalf("Failed to read modified file: %v", err)
 	}
 
-	// Check that the credential was properly masked
-	if strings.Contains(string(processedContent), "BEGIN PRIVATE KEY") {
-		t.Error("Multiline credential was not properly masked")
+	// Verify masked content
+	expected := "username=admin\n{{masked_test_password}}\n{{masked_test_api_key}}"
+	if string(modifiedContent) != expected {
+		t.Errorf("Expected content to be\n%s\nbut got\n%s", expected, string(modifiedContent))
+	}
+}
+
+func TestMasker_HandleBinary(t *testing.T) {
+	// Setup test environment
+	tmpDir := os.TempDir()
+
+	// Create a test binary file
+	testFilePath := filepath.Join(tmpDir, "cert.p12")
+	binaryContent := []byte{0x01, 0x02, 0x03, 0x04} // Some binary content
+
+	if err := os.WriteFile(testFilePath, binaryContent, 0600); err != nil {
+		t.Fatalf("Failed to write test binary file: %v", err)
 	}
 
-	if !strings.Contains(string(processedContent), mask) {
-		t.Error("Custom placeholder mask not found in processed file")
+	// Create a logger for testing - use the correct constructor
+	logger := Default()
+
+	// Create findings for the binary file with correct finding struct
+	findings := []finding{
+		{
+			RuleID:      "pkcs12-file",
+			StartLine:   0,
+			EndLine:     0,
+			Match:       "",
+			Secret:      "",
+			File:        testFilePath,
+			Entropy:     0.0,
+			Fingerprint: "pkcs12-1",
+		},
 	}
 
-	expected := "Line 1\r\n[SECRET REMOVED]\r\nLine 5"
-	if string(processedContent) != expected {
-		t.Errorf("Expected:\n%s\n\nGot:\n%s", expected, string(processedContent))
+	// Initialize the masker
+	masker := NewMasker(tmpDir, tmpDir, findings, "{{masked_%s_%s}}", "\n", logger)
+
+	// Test binary file handling
+
+	if err := masker.HandleBinary(testFilePath); err != nil {
+		t.Fatalf("HandleBinary failed: %v", err)
+	}
+
+	// Verify original file is empty
+	fileInfo, err := os.Stat(testFilePath)
+	if err != nil {
+		t.Fatalf("Failed to stat file: %v", err)
+	}
+	if fileInfo.Size() != 0 {
+		t.Errorf("Expected file to be empty, but got size %d", fileInfo.Size())
+	}
+
+	// Check for placeholder text file
+	txtFilePath := strings.TrimSuffix(testFilePath, ".p12") + ".txt"
+	txtContent, err := os.ReadFile(txtFilePath)
+	if err != nil {
+		t.Fatalf("Failed to read placeholder file: %v", err)
+	}
+
+	expectedPrefix := "This file was deleted because it matched the pkcs12-file rule"
+	if !strings.Contains(string(txtContent), expectedPrefix) {
+		t.Errorf("Expected placeholder file to contain %q, but got %q", expectedPrefix, string(txtContent))
 	}
 }

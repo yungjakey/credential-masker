@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -210,10 +211,14 @@ func (m *Masker) HandleText(buf []byte, path string, findings ...finding) error 
 	// Join all lines to create a single text buffer
 	fullText := string(buf)
 
+	// Clean up the filename for variable naming
+	cleanFileName := cleanFileName(path)
+
 	// Process each finding sequentially
 	for _, f := range findings {
 		// Replace the match with our placeholder
-		fullText = strings.Replace(fullText, f.Match, m.placeholderMask, -1)
+		placeholder := fmt.Sprintf(m.placeholderMask, cleanFileName, f.RuleID)
+		fullText = strings.Replace(fullText, f.Match, placeholder, -1)
 	}
 
 	// Split text back into lines
@@ -225,4 +230,18 @@ func (m *Masker) HandleText(buf []byte, path string, findings ...finding) error 
 	}
 
 	return nil
+}
+
+func cleanFileName(path string) string {
+	// Get filename without extension for variable name
+	fileName := filepath.Base(path)
+	fileName = strings.TrimSuffix(fileName, filepath.Ext(fileName))
+
+	// Clean up the filename for variable naming
+	return strings.Map(func(r rune) rune {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
+			return r
+		}
+		return '_'
+	}, fileName)
 }

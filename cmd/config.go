@@ -24,7 +24,7 @@ func parseAndValidateFlags() (*config, error) {
 	targetDir := flag.String("target", "external/target/arcon_formulare", "Path to target repository for masked files")
 	logLevelStr := flag.String("log-level", "INFO", "Log level (DEBUG, INFO, SUCCESS, WARNING, ERROR, FATAL)")
 	shutdownTimeout := flag.Int("shutdown-timeout", 15, "Timeout in seconds for graceful shutdown")
-	placeholderMask := flag.String("mask", "***[REDACTED]***", "Placeholder text for masked credentials")
+	placeholderMask := flag.String("mask", "Environment.GetEnvironmentVariable(\"%s__%s\")", "Placeholder text for masked credentials")
 	newLineSequence := flag.String("newline", "\r\n", "Newline sequence to use when writing files")
 	showHelp := flag.Bool("help", false, "Display help information")
 	flag.BoolVar(showHelp, "h", false, "Display help information (shorthand)")

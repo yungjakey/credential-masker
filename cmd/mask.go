@@ -11,18 +11,19 @@ import (
 )
 
 const placeholderPrefix = "This file was deleted because it matched the pkcs12-file rule. Original file: %s"
-const placeholderMask = "***[REDACTED]***"
 
 // Masker handles the masking of sensitive data in files
 type Masker struct {
-	logger    *Logger
-	findings  map[string][]finding // Map of file path to findings
-	sourceDir string
-	targetDir string
+	logger          *Logger
+	findings        map[string][]finding // Map of file path to findings
+	sourceDir       string
+	targetDir       string
+	placeholderMask string
+	newLineSequence string
 }
 
 // NewMasker creates a new Masker with the given logger
-func NewMasker(sourceDir string, targetDir string, findings []finding, logger *Logger) *Masker {
+func NewMasker(sourceDir string, targetDir string, findings []finding, placeholderMask string, newLineSequence string, logger *Logger) *Masker {
 	// Group findings by file
 	fileFindings := make(map[string][]finding)
 	for _, f := range findings {
@@ -32,10 +33,12 @@ func NewMasker(sourceDir string, targetDir string, findings []finding, logger *L
 	}
 
 	return &Masker{
-		logger:    logger,
-		findings:  fileFindings,
-		sourceDir: sourceDir,
-		targetDir: targetDir,
+		logger:          logger,
+		findings:        fileFindings,
+		sourceDir:       sourceDir,
+		targetDir:       targetDir,
+		placeholderMask: placeholderMask,
+		newLineSequence: newLineSequence,
 	}
 }
 
@@ -180,7 +183,7 @@ func (m *Masker) RecreateFile(path string, lines ...string) error {
 	defer f.Close()
 
 	if len(lines) > 0 {
-		content := strings.Join(lines, "\r\n")
+		content := strings.Join(lines, m.newLineSequence)
 		if _, err := f.WriteString(content); err != nil {
 			return fmt.Errorf("Error writing to file: %v", err)
 		}
@@ -213,11 +216,11 @@ func (m *Masker) HandleText(buf []byte, path string, findings ...finding) error 
 	// Process each finding sequentially
 	for _, f := range findings {
 		// Replace the match with our placeholder
-		fullText = strings.Replace(fullText, f.Match, placeholderMask, -1)
+		fullText = strings.Replace(fullText, f.Match, m.placeholderMask, -1)
 	}
 
 	// Split text back into lines
-	updatedLines := strings.Split(fullText, "\r\n")
+	updatedLines := strings.Split(fullText, m.newLineSequence)
 
 	// Recreate file with updated lines
 	if err := m.RecreateFile(path, updatedLines...); err != nil {

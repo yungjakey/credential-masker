@@ -31,11 +31,14 @@ func printUsage() {
 	fmt.Println("\nUsage:")
 	fmt.Println("  credential-masker [flags]")
 	fmt.Println("\nFlags:")
-	fmt.Println("  --source     Source directory containing original code")
-	fmt.Println("  --target     Target directory where masked code will be written")
-	fmt.Println("  --findings   Path to gitleaks JSON findings file")
-	fmt.Println("  --log-level  Log level (DEBUG, INFO, SUCCESS, WARNING, ERROR, FATAL) [default: INFO]")
-	fmt.Println("  --help       Display this help message")
+	fmt.Println("  --source            Source directory containing original code")
+	fmt.Println("  --target            Target directory where masked code will be written")
+	fmt.Println("  --findings          Path to gitleaks JSON findings file")
+	fmt.Println("  --log-level         Log level (DEBUG, INFO, SUCCESS, WARNING, ERROR, FATAL) [default: INFO]")
+	fmt.Println("  --mask              Placeholder text for masked credentials [default: ***[REDACTED]***]")
+	fmt.Println("  --newline           Newline sequence to use when writing files [default: \\r\\n]")
+	fmt.Println("  --shutdown-timeout  Timeout in seconds for graceful shutdown [default: 5]")
+	fmt.Println("  --help              Display this help message")
 	fmt.Println("\nExample:")
 	fmt.Println("  credential-masker --source ./myproject --target ./masked-project --findings ./gitleaks.json")
 }
@@ -56,47 +59,26 @@ func loadFindings(path string) ([]finding, error) {
 	return findings, nil
 }
 
-// watcher monitors for termination signals and cancels the main context
-func watcher(cancel context.CancelFunc, logger *Logger) {
-	// Setup signal handling
-	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
-
-	sig := <-signalChan
-	logger.Info("Received signal: %s", sig)
-	logger.Info("Gracefully shutting down...")
-
-	cancel() // Cancel the main context
-}
-
 func main() {
-	// Check for help flag first
-	for _, arg := range os.Args[1:] {
-		if arg == "-h" || arg == "--help" {
-			printUsage()
-			return
-		}
-	}
-
-	// Parse and validate flags - this also sets up the logger
 	cfg, err := parseAndValidateFlags()
 	if err != nil {
 		fmt.Printf("❌ %v\n", err)
 		printUsage()
 		os.Exit(1)
 	}
+
+	if cfg.showHelp {
+		printUsage()
+		return
+	}
+
 	log := cfg.logger
 
-	// Create a context that can be canceled
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
-	// Run the signal handler in a goroutine
-	go watcher(cancel, log)
-
-	// Create a channel to signal completion
 	done := make(chan struct{})
 
-	// Run the main processing in a goroutine
 	go func() {
 		defer close(done)
 
@@ -105,22 +87,17 @@ func main() {
 			log.Fatal("%v", err)
 		}
 
-		// Print all unique types of findings
 		uniqueTypes := make(map[string]bool)
 		for _, f := range findings {
 			uniqueTypes[f.RuleID] = true
 		}
-
 		log.Debug("Unique types of findings:")
 		for t := range uniqueTypes {
 			log.Debug("  - %s", t)
 		}
 
-		// Check if the target directory exists
 		if _, err = os.Stat(cfg.targetDir); os.IsNotExist(err) {
 			log.Info("Target directory does not exist, creating: %s", cfg.sourceDir)
-
-			// Copy the source directory to the target directory
 			if err = cp.Copy(cfg.sourceDir, cfg.targetDir); err != nil {
 				log.Fatal("%v", err)
 			}
@@ -129,13 +106,17 @@ func main() {
 			log.Info("Target directory already exists: %s", cfg.targetDir)
 		}
 
-		// Create a new Masker with findings and directories
-		masker := NewMasker(cfg.sourceDir, cfg.targetDir, findings, log)
+		masker := NewMasker(
+			cfg.sourceDir,
+			cfg.targetDir,
+			findings,
+			cfg.placeholderMask,
+			cfg.newLineSequence,
+			log,
+		)
 
-		// Process all findings with context
 		fileFindings := masker.ProcessWithContext(ctx)
 
-		// Check if context was canceled
 		if ctx.Err() != nil {
 			log.Warning("Processing was interrupted: %v", ctx.Err())
 			return
@@ -143,7 +124,6 @@ func main() {
 
 		log.Success("Processed %d findings", len(findings))
 
-		// Save file findings to JSON
 		fileFindingsJSON, err := json.MarshalIndent(fileFindings, "", "  ")
 		if err != nil {
 			log.Fatal("Error marshalling file findings to JSON: %v", err)
@@ -157,18 +137,23 @@ func main() {
 		log.Success("Saved file findings to %s", outputPath)
 	}()
 
-	// Wait for either completion or context cancellation
 	select {
 	case <-done:
-		// Processing completed normally
+		// All good
+		return
 	case <-ctx.Done():
-		// Context was canceled, wait for graceful shutdown
-		select {
-		case <-done:
-			// Processing completed during graceful shutdown
-		case <-time.After(5 * time.Second):
-			log.Warning("Shutdown timed out after 5 seconds")
-		}
+		log.Warning("Shutdown signal received, waiting up to %v for graceful shutdown...", cfg.shutdownTimeout)
+	}
+
+	// Now wait for completion or timeout AFTER signal, no nested select
+	timer := time.NewTimer(cfg.shutdownTimeout)
+	defer timer.Stop()
+
+	select {
+	case <-done:
+		log.Info("Graceful shutdown completed in time")
+	case <-timer.C:
+		log.Error("Shutdown timeout exceeded. Forcing exit.")
 		os.Exit(1)
 	}
 }

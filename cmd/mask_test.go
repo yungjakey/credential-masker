@@ -49,7 +49,7 @@ func TestMasker_HandleText(t *testing.T) {
 	}
 
 	// Initialize the masker
-	masker := NewMasker(tmpDir, tmpDir, findings, "{{masked_%s__%s}}", "\n", logger)
+	masker := NewMasker(tmpDir, tmpDir, findings, "{{masked_%s__%s__%s}}", "\n", logger)
 
 	// Test text file handling
 	buf, _ := os.ReadFile(testFilePath)
@@ -101,7 +101,7 @@ func TestMasker_HandleBinary(t *testing.T) {
 	}
 
 	// Initialize the masker
-	masker := NewMasker(tmpDir, tmpDir, findings, "{{masked_%s_%s}}", "\n", logger)
+	masker := NewMasker(tmpDir, tmpDir, findings, "{{masked_%s__%s__%s}}", "\n", logger)
 
 	// Test binary file handling
 

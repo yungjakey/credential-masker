@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"os"
 	"os/signal"
@@ -26,24 +27,6 @@ type finding struct {
 	ID          string  `json:"id"`          // Unique ID for this finding
 }
 
-// printUsage displays help information about command usage
-func printUsage() {
-	fmt.Println("Credential Masker - A tool to mask credentials in source code")
-	fmt.Println("\nUsage:")
-	fmt.Println("  credential-masker [flags]")
-	fmt.Println("\nFlags:")
-	fmt.Println("  --source            Source directory containing original code")
-	fmt.Println("  --target            Target directory where masked code will be written")
-	fmt.Println("  --findings          Path to gitleaks JSON findings file")
-	fmt.Println("  --log-level         Log level (DEBUG, INFO, SUCCESS, WARNING, ERROR, FATAL) [default: INFO]")
-	fmt.Println("  --mask              Placeholder text for masked credentials [default: ***[REDACTED]***]")
-	fmt.Println("  --newline           Newline sequence to use when writing files [default: \\r\\n]")
-	fmt.Println("  --shutdown-timeout  Timeout in seconds for graceful shutdown [default: 5]")
-	fmt.Println("  --help              Display this help message")
-	fmt.Println("\nExample:")
-	fmt.Println("  credential-masker --source ./myproject --target ./masked-project --findings ./gitleaks.json")
-}
-
 // loadFindings loads and parses the findings JSON file
 func loadFindings(path string) ([]finding, error) {
 	raw, err := os.ReadFile(path)
@@ -64,12 +47,11 @@ func main() {
 	cfg, err := parseAndValidateFlags()
 	if err != nil {
 		fmt.Printf("❌ %v\n", err)
-		printUsage()
+		flag.Usage()
 		os.Exit(1)
 	}
 
 	if cfg.showHelp {
-		printUsage()
 		return
 	}
 

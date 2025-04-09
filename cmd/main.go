@@ -23,6 +23,7 @@ type finding struct {
 	File        string  `json:"file"`        // Path to the file containing the secret
 	Entropy     float64 `json:"entropy"`     // Entropy score of the secret
 	Fingerprint string  `json:"fingerprint"` // Unique identifier for this finding
+	ID          string  `json:"id"`          // Unique ID for this finding
 }
 
 // printUsage displays help information about command usage

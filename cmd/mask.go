@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"unicode/utf8"
+
+	"github.com/google/uuid"
 )
 
 const placeholderPrefix = "This file was deleted because it matched the pkcs12-file rule. Original file: %s"
@@ -29,6 +31,7 @@ func NewMasker(sourceDir string, targetDir string, findings []finding, placehold
 	fileFindings := make(map[string][]finding)
 	for _, f := range findings {
 		// replace source and target directory
+		f.ID = uuid.New().String()
 		path := strings.NewReplacer(sourceDir, targetDir).Replace(f.File)
 		fileFindings[path] = append(fileFindings[path], f)
 	}
@@ -212,12 +215,13 @@ func (m *Masker) HandleText(buf []byte, path string, findings ...finding) error 
 	fullText := string(buf)
 
 	// Clean up the filename for variable naming
-	cleanFileName := cleanFileName(path)
+	maskPrefix := cleanFileName(path)
 
 	// Process each finding sequentially
 	for _, f := range findings {
 		// Replace the match with our placeholder
-		placeholder := fmt.Sprintf(m.placeholderMask, cleanFileName, f.RuleID)
+		maskSuffix := fmt.Sprintf("%s__%s", f.ID, f.RuleID)
+		placeholder := fmt.Sprintf(m.placeholderMask, maskPrefix, maskSuffix)
 		fullText = strings.Replace(fullText, f.Match, placeholder, -1)
 	}
 

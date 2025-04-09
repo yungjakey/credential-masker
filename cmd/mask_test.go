@@ -33,6 +33,7 @@ func TestMasker_HandleText(t *testing.T) {
 			File:        testFilePath,
 			Entropy:     3.5,
 			Fingerprint: "password-1",
+			ID:          "test-id-1", // Add fixed ID for testing
 		},
 		{
 			RuleID:      "api_key",
@@ -43,6 +44,7 @@ func TestMasker_HandleText(t *testing.T) {
 			File:        testFilePath,
 			Entropy:     2.8,
 			Fingerprint: "api-key-1",
+			ID:          "test-id-2", // Add fixed ID for testing
 		},
 	}
 
@@ -61,8 +63,8 @@ func TestMasker_HandleText(t *testing.T) {
 		t.Fatalf("Failed to read modified file: %v", err)
 	}
 
-	// Verify masked content
-	expected := "username=admin\n{{masked_test_password}}\n{{masked_test_api_key}}"
+	// Verify masked content with the new UUID pattern
+	expected := "username=admin\n{{masked_test_test-id-1__password}}\n{{masked_test_test-id-2__api_key}}"
 	if string(modifiedContent) != expected {
 		t.Errorf("Expected content to be\n%s\nbut got\n%s", expected, string(modifiedContent))
 	}
@@ -94,6 +96,7 @@ func TestMasker_HandleBinary(t *testing.T) {
 			File:        testFilePath,
 			Entropy:     0.0,
 			Fingerprint: "pkcs12-1",
+			ID:          "test-id-3", // Add fixed ID for testing
 		},
 	}
 

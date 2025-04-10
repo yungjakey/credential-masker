@@ -80,7 +80,7 @@ jobs:
       - name: Build binary
         run: |
           # Disable CGO for cross-compilation
-          CGO_ENABLED=${{ matrix.platform.os == 'android' }} GOOS=${{ matrix.platform.os }} GOARCH=${{ matrix.platform.arch }} go build -o dist/${{ matrix.platform.output }} ./cmd
+          CGO_ENABLED=${{ matrix.platform.os == 'android' && '1' || '0' }} GOOS=${{ matrix.platform.os }} GOARCH=${{ matrix.platform.arch }} go build -o dist/${{ matrix.platform.output }} ./cmd
 
       - name: Upload binary
         uses: actions/upload-artifact@v4

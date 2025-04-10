@@ -26,25 +26,18 @@ jobs:
         platform:
           - os: linux
             arch: amd64
-            output: credential-masker-linux-amd64
           - os: linux
             arch: arm64
-            output: credential-masker-linux-arm64
           - os: darwin
             arch: amd64
-            output: credential-masker-darwin-amd64
           - os: darwin
             arch: arm64
-            output: credential-masker-darwin-arm64
           - os: windows
             arch: amd64
-            output: credential-masker-windows-amd64.exe
-          - os: android
-            arch: arm
-            output: credential-masker-android-arm
           - os: android
             arch: arm64
-            output: credential-masker-android-arm64
+    env:
+      OUTPUT: dist/credential-masker-${{ matrix.platform.os }}-${{ matrix.platform.arch }}${{ matrix.platform.os == 'windows' && '.exe' || '' }}
 
     steps:
       - name: Checkout code
@@ -80,13 +73,13 @@ jobs:
       - name: Build binary
         run: |
           # Disable CGO for cross-compilation
-          CGO_ENABLED=${{ matrix.platform.os == 'android' && '1' || '0' }} GOOS=${{ matrix.platform.os }} GOARCH=${{ matrix.platform.arch }} go build -o dist/${{ matrix.platform.output }} ./cmd
+          CGO_ENABLED=0 GOOS=${{ matrix.platform.os }} GOARCH=${{ matrix.platform.arch }} go build -o dist/${{ env.OUTPUT }} ./cmd
 
       - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.platform.output }}
-          path: dist/${{ matrix.platform.output }}
+          name: ${{ env.OUTPUT }}
+          path: dist/${{ env.OUTPUT }}
 
   create-release:
     needs: build-binaries
@@ -116,7 +109,6 @@ jobs:
             artifacts/credential-masker-darwin-amd64/credential-masker-darwin-amd64
             artifacts/credential-masker-darwin-arm64/credential-masker-darwin-arm64
             artifacts/credential-masker-windows-amd64.exe/credential-masker-windows-amd64.exe
-            artifacts/credential-masker-android-arm/credential-masker-android-arm
             artifacts/credential-masker-android-arm64/credential-masker-android-arm64
           draft: false
           prerelease: false

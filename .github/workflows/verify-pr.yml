@@ -16,15 +16,38 @@ jobs:
         with:
           go-version: '1.23'
 
-      # Verify Go modules 
+      - name: Go module cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      # Verify Go modules
       - name: Verify Go modules
         run: |
           go mod tidy
           go mod verify
 
-      # Run tests if you have them
+      # Add linting
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: latest
+
+      # Run tests with coverage
       - name: Run tests
-        run: go test -v ./...
+        run: go test -v -coverprofile=coverage.txt -covermode=atomic ./...
+
+      # Upload coverage report (optional)
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.txt
+          fail_ci_if_error: false
 
       # Verify build works for at least one platform
       - name: Verify build

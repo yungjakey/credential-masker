@@ -1,9 +1,8 @@
 name: Create Release
 
 on:
-  push:
-    tags:
-      - "v*"
+  release:
+    types: [created]
   workflow_dispatch:
     inputs:
       tag:
@@ -12,7 +11,7 @@ on:
         default: ''
 
 env:
-  RELEASE_VERSION: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
+  RELEASE_VERSION: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.event.release.tag_name }}
 
 jobs:
   build-binaries:
@@ -81,7 +80,7 @@ jobs:
           name: ${{ env.OUTPUT }}
           path: dist/${{ env.OUTPUT }}
 
-  create-release:
+  finalize-release:
     needs: build-binaries
     runs-on: ubuntu-latest
     permissions:
@@ -89,6 +88,15 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        if: github.event_name == 'workflow_dispatch'
+
+      - name: Verify release tag exists if manual trigger
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          if ! git ls-remote --tags origin | grep -q "refs/tags/${{ env.RELEASE_VERSION }}"; then
+            echo "Error: Tag ${{ env.RELEASE_VERSION }} doesn't exist. Please create it first or check the name."
+            exit 1
+          fi
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
@@ -98,7 +106,7 @@ jobs:
       - name: Display structure of downloaded files
         run: ls -R artifacts
 
-      - name: Create Release
+      - name: Attach binaries to release
         uses: softprops/action-gh-release@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -112,4 +120,5 @@ jobs:
             artifacts/credential-masker-android-arm64/credential-masker-android-arm64
           draft: false
           prerelease: false
-          generate_release_notes: true
+          # Don't generate release notes again if this was triggered by release-please
+          generate_release_notes: ${{ github.event_name == 'workflow_dispatch' }}

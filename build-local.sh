@@ -132,7 +132,6 @@ if [ "$PUBLISH_RELEASE" = true ]; then
         dist/credential-masker-darwin-amd64 \
         dist/credential-masker-darwin-arm64 \
         dist/credential-masker-windows-amd64.exe \
-        dist/credential-masker-android-arm \
         dist/credential-masker-android-arm64
 
     echo "✓ Successfully published release $VERSION_TAG with binaries"
